@@ -1,0 +1,9 @@
+# Intellij
+.idea/
+*.iml
+*.iws
+.idea_modules
+.project
+.settings
+target
+.classpath
