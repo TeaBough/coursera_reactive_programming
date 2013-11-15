@@ -7,3 +7,6 @@
 .settings
 target
 .classpath
+srcs
+io.netty
+docs
