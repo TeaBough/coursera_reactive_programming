@@ -74,6 +74,16 @@ abstract class CircuitSimulator extends Simulator {
     a2 addAction orAction
   }
 
+  def identityGate(a: Wire, output: Wire) {
+    def identityAction() {
+      val aSig = a.getSignal
+      afterDelay(OrGateDelay) {
+        output.setSignal(aSig)
+      }
+    }
+    a addAction identityAction
+  }
+
   def orGate2(a1: Wire, a2: Wire, output: Wire) {
     val o1 = new Wire
     val o2 = new Wire
@@ -85,40 +95,28 @@ abstract class CircuitSimulator extends Simulator {
   }
 
   def demux(in: Wire, c: List[Wire], out: List[Wire]) {
-    def demuxRec(in: List[Wire], controllers: List[Wire], outputs:List[Wire]) {
-      if (controllers.size == 1) {
-        val c = controllers.head
-        in.foldLeft(outputs)((acc: List[Wire], w: Wire) => {
-          val o1 = outputs.head
-          val o2 = new Wire
-          val o3 = outputs.tail.head
-          inverter(c, o2)
-          andGate(w, c, o1)
-          andGate(w, o2, o3)
-          acc.tail.tail
-        })
-      }
-      else {
-        val c = controllers.head
-        val newInputs = in.foldLeft(List[Wire]())((acc: List[Wire], w: Wire) => {
-          val o1 = new Wire
-          val o2 = new Wire
-          val o3 = new Wire
-          inverter(c, o2)
-          andGate(w, c, o1)
-          andGate(w, o2, o3)
-          acc.:::(List(o1, o3))
-        })
-        demuxRec(newInputs,controllers.tail,outputs)
+    def recurse(in: Wire, c: List[Wire], out: List[Wire]) {
+      val newIn1, notControl, newIn2 = new Wire
+      c match {
+        case control :: rest => {
+          andGate(in, control, newIn2)
+          inverter(control, notControl)
+          andGate(in, notControl, newIn1)
+
+          val leftHalf = out.take(out.length / 2)
+          val rightHalf = out.takeRight(out.length / 2)
+          recurse(newIn2, rest, leftHalf)
+          recurse(newIn1, rest, rightHalf)
+        }
+        case _ => {
+          val w = new Wire
+          w.setSignal(true)
+          andGate(in, w, out.head)
+        }
       }
     }
-    demuxRec(List(in),c.reverse,out)
-    /*val o1 = new Wire
-    inverter(c.head, o1)
-    andGate(in, o1, out.head)
-    andGate(in, c.head, out.tail.head)*/
+    recurse(in, c, out)
   }
-
 }
 
 object Circuit extends CircuitSimulator {
@@ -142,10 +140,6 @@ object Circuit extends CircuitSimulator {
     in2.setSignal(true)
     run
   }
-
-  //
-  // to complete with orGateExample and demuxExample...
-  //
 }
 
 object CircuitMain extends App {
