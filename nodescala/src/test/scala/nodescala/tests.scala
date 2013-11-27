@@ -1,7 +1,6 @@
 package nodescala
 
 
-
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import scala.collection._
@@ -34,6 +33,50 @@ class NodeScalaSuite extends FunSuite {
     }
   }
 
+  test("A Future all success") {
+    val l = List(Future.always(1), Future.always(2), Future.always(3), Future.always(4))
+    val res = Future.all(l)
+    res.onComplete {
+      case Success(ll) => {
+        assert(ll.size == 4)
+      }
+      case Failure(t) => assert(false)
+    }
+  }
+
+  test("A Future one fail") {
+    val l = List(Future.always(1), Future.always(2), Future.always(3), Future.always(4))
+    val res = Future.all(l)
+    res.onComplete {
+      case Success(ll) => {
+        assert(false)
+      }
+      case Failure(t) => assert(true)
+    }
+  }
+
+  test("A Future any with") {
+    val l = List(Future.always(1), Future.always(2), Future.always(3), Future {
+      throw new Exception
+    })
+    val res = Future.any(l)
+    res.onComplete {
+      case Success(ll) => {
+        println("Success")
+        assert(ll == 1 || ll == 2)
+      }
+      case Failure(t) => {
+        try {
+          println("Failure")
+          t
+          assert(false)
+        } catch {
+          case tt: Exception =>
+        }
+      }
+    }
+  }
+
   test("CancellationTokenSource should allow stopping the computation") {
     val cts = CancellationTokenSource()
     val ct = cts.cancellationToken
@@ -51,12 +94,31 @@ class NodeScalaSuite extends FunSuite {
     assert(Await.result(p.future, 1 second) == "done")
   }
 
+  test("Let's test run") {
+    val working = Future.run() {
+      ct =>
+        Future {
+          while (true) {
+            println("working")
+          }
+          println("done")
+        }
+    }
+    Future.delay(10 seconds) onSuccess {
+      case _ => println("Boom") // if loop still not completed, cancel it
+    }
+
+
+  }
+
   class DummyExchange(val request: Request) extends Exchange {
     @volatile var response = ""
     val loaded = Promise[String]()
+
     def write(s: String) {
       response += s
     }
+
     def close() {
       loaded.success(response)
     }
@@ -118,7 +180,6 @@ class NodeScalaSuite extends FunSuite {
       val f = dummy.nextRequest()
       dummy.emit(req)
       val (reqReturned, xchg) = Await.result(f, 1 second)
-
       assert(reqReturned == req)
     }
 
